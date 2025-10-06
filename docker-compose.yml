@@ -1,0 +1,30 @@
+services:
+  # Main pipeline service
+  pipeline:
+    build: .
+    container_name: nyc-taxi-pipeline
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./sql:/app/sql
+      - ./src:/app/src
+    environment:
+      - PIPELINE_ENV=${PIPELINE_ENV:-development}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DUCKDB_PATH=/app/data/database/nyc_taxi.duckdb
+    env_file:
+      - .env
+    command: python -m src.orchestration.flows --sample
+    
+  # Prefect server for monitoring (optional)
+  prefect-server:
+    image: prefecthq/prefect:2.14-python3.11
+    container_name: nyc-taxi-prefect
+    ports:
+      - "4200:4200"
+    environment:
+      - PREFECT_API_URL=http://localhost:4200/api
+    command: prefect server start
+    profiles:
+      - monitoring
+

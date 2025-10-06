@@ -341,17 +341,6 @@ class DataTransformer:
         """Transform all raw data to fact_trips"""
         logger.info(" Starting full transformation to fact_trips...")
 
-        # Clear existing fact_trips to avoid expensive conflict checking
-        # This makes transformations much faster and uses less memory
-        conn = DatabaseConnection.get_connection()
-        existing_count = conn.execute("SELECT COUNT(*) FROM fact_trips").fetchone()[0]
-        if existing_count > 0:
-            logger.info(
-                f" Clearing {existing_count:,} existing fact_trips for fresh transformation..."
-            )
-            conn.execute("DELETE FROM fact_trips")
-            logger.success(" Cleared existing fact_trips")
-
         yellow_count = DataTransformer.transform_yellow_to_fact()
         green_count = DataTransformer.transform_green_to_fact()
         hvfhv_count = DataTransformer.transform_hvfhv_to_fact()

@@ -1,0 +1,52 @@
+# NYC TLC Data Pipeline Configuration
+data_sources:
+  base_url: "https://d37ci6vzurychx.cloudfront.net/trip-data"
+  
+  services:
+    yellow:
+      filename_pattern: "yellow_tripdata_{year:04d}-{month:02d}.parquet"
+      enabled: true
+    
+    green:
+      filename_pattern: "green_tripdata_{year:04d}-{month:02d}.parquet"
+      enabled: true
+    
+    hvfhv:
+      filename_pattern: "fhvhv_tripdata_{year:04d}-{month:02d}.parquet"
+      enabled: true
+  
+  taxi_zones:
+    url: "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
+
+date_range:
+  start_date: "2021-01"
+  end_date: "2025-01"
+
+database:
+  path: "data/database/nyc_taxi.duckdb"
+  memory_limit: "8GB"
+  threads: 4
+
+directories:
+  raw_data: "data/raw"
+  database: "data/database"
+  logs: "data/logs"
+  sql: "sql"
+
+ingestion:
+  max_concurrent_downloads: 10
+  retry_attempts: 3
+  retry_delay_seconds: 5
+  chunk_size: 8192
+  timeout_seconds: 300
+
+quality_checks:
+  max_fare: 1000
+  max_trip_distance: 500
+  max_speed_mph: 100
+  min_trip_duration_seconds: 60
+  max_trip_duration_hours: 24
+
+logging:
+  level: "INFO"
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}"

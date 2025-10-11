@@ -151,7 +151,7 @@ def run_pipeline(sample):
 
         logger.success(" Ingestion pipeline completed successfully!")
         logger.info(
-            " Run 'python -m src.cli run-e2e' for full E2E pipeline with transformations"
+            " Run 'uv run python -m src.cli run-e2e' for full E2E pipeline with transformations"
         )
 
     except Exception as e:

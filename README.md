@@ -93,7 +93,7 @@ This project implements a production-quality data pipeline that:
 ```bash
 # Clone repository
 git clone <repo-url>
-cd data_pipeline
+cd nyc-tlc-analytics-pipeline
 
 # Run setup (installs uv, creates venv, installs dependencies)
 ./scripts/setup.sh

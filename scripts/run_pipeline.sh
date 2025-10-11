@@ -17,18 +17,14 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
-# Activate virtual environment if not already active
-if [[ -z "$VIRTUAL_ENV" ]]; then
-    if [ -f .venv/bin/activate ]; then
-        source .venv/bin/activate
-    else
-        echo " Virtual environment not found. Run ./scripts/setup.sh first"
-        exit 1
-    fi
+# Check for uv
+if ! command -v uv &> /dev/null; then
+    echo " Error: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
 fi
 
 # Run full pipeline
-python -m src.cli run-pipeline --full
+uv run python -m src.cli run-pipeline --full
 
 echo ""
 echo "======================================================================"
@@ -38,8 +34,8 @@ echo ""
 echo "Database location: data/database/nyc_taxi.duckdb"
 echo ""
 echo "Next steps:"
-echo "  • Query the database: python -m src.cli db-stats"
-echo "  • Run analytics queries from sql/analytics/"
-echo "  • Or explore in Jupyter: docker-compose --profile analysis up jupyter"
+echo "  • Query the database: uv run python -m src.cli db-stats"
+echo "  • Run analytics queries: uv run python -m src.cli run-analytics sql/analytics/01_top_zones_by_revenue.sql"
+echo "  • Explore all queries: ls sql/analytics/"
 echo ""
 

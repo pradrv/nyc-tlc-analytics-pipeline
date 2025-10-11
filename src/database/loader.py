@@ -246,7 +246,7 @@ class DataLoader:
             filename_pattern = service_config.get("filename_pattern", "")
 
             # Find all parquet files for this service
-            pattern = filename_pattern.replace("{year}", "*").replace(
+            pattern = filename_pattern.replace("{year:04d}", "*").replace(
                 "{month:02d}", "*"
             )
             files = list(config.raw_data_dir.glob(pattern))
@@ -266,10 +266,10 @@ class DataLoader:
         logger.info("=" * 70)
         logger.info(" Load Summary:")
         logger.info(f"   Total files: {len(results)}")
-        logger.info(f"    Loaded: {successful}")
-        logger.info(f"     Skipped: {skipped}")
-        logger.info(f"    Failed: {failed}")
-        logger.info(f"    Total rows: {total_rows:,}")
+        logger.info(f"   Loaded: {successful}")
+        logger.info(f"   Skipped: {skipped}")
+        logger.info(f"   Failed: {failed}")
+        logger.info(f"   Total rows: {total_rows:,}")
         logger.info("=" * 70)
 
         return results

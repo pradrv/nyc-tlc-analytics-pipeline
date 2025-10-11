@@ -13,9 +13,12 @@ echo "Press Ctrl+C to stop the server"
 echo ""
 echo "======================================================================"
 
-# Activate virtual environment
-source .venv/bin/activate
+# Check for uv
+if ! command -v uv &> /dev/null; then
+    echo " Error: uv not found. Install with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    exit 1
+fi
 
 # Start Prefect server
-prefect server start
+uv run prefect server start
 

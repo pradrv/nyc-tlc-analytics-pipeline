@@ -21,6 +21,11 @@ data_sources:
 date_range:
   start_date: "2021-01"
   end_date: "2025-01"
+  
+  # Sample months for quick testing (includes pre/post CBD congestion fee)
+  sample_months:
+    - "2024-12"  # Pre-congestion fee
+    - "2025-01"  # Post-congestion fee (started Jan 5, 2025)
 
 database:
   path: "data/database/nyc_taxi.duckdb"

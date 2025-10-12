@@ -8,6 +8,7 @@ from loguru import logger
 
 from src.config import config
 from src.database.connection import DatabaseConnection
+from src.database.schema_drift import SchemaDriftHandler
 from src.ingestion.validators import FileValidator
 
 
@@ -163,37 +164,23 @@ class DataLoader:
                     "load_time": 0,
                 }
 
-            # Load data with metadata
-            insert_sql = f"""
-                INSERT INTO {raw_table}
-                SELECT 
-                    *,
-                    '{file_path.name}' AS source_file,
-                    CURRENT_TIMESTAMP AS ingestion_timestamp
-                FROM parquet_scan('{file_path}')
-            """
-
-            conn.execute(insert_sql)
-
-            # Get row count
-            row_count = conn.execute(f"""
-                SELECT COUNT(*) 
-                FROM {raw_table}
-                WHERE source_file = '{file_path.name}'
-            """).fetchone()[0]
+            # Load data with automatic schema drift handling
+            rows_inserted = SchemaDriftHandler.load_with_schema_handling(
+                raw_table, file_path, file_path.name
+            )
 
             load_time = (datetime.now() - start_time).total_seconds()
 
             logger.success(
-                f" Loaded {file_path.name}: {row_count:,} rows in {load_time:.2f}s "
-                f"({row_count / load_time:.0f} rows/sec)"
+                f" Loaded {file_path.name}: {rows_inserted:,} rows in {load_time:.2f}s "
+                f"({rows_inserted / max(load_time, 0.001):.0f} rows/sec)"
             )
 
             return {
                 "file_path": file_path,
                 "service_type": service_type,
                 "table": raw_table,
-                "rows_inserted": row_count,
+                "rows_inserted": rows_inserted,
                 "rows_existing": 0,
                 "status": "success",
                 "load_time": load_time,

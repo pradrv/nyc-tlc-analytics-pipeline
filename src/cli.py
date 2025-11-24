@@ -269,7 +269,7 @@ def run_e2e(sample, skip_download):
         )
         logger.success("=" * 70)
         logger.info(" Query analytics: ls sql/analytics/*.sql")
-        logger.info(" Database stats: python -m src.cli db-stats")
+        logger.info(" Database stats: uv run python -m src.cli db-stats")
 
     except Exception as e:
         logger.error(f" E2E Pipeline failed: {e}")

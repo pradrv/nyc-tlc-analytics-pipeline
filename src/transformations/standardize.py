@@ -15,45 +15,35 @@ class DataTransformer:
 
         conn = DatabaseConnection.get_connection()
 
-        # Optimize DuckDB settings for 32GB Mac
-        conn.execute("SET memory_limit='8GB'")
-        conn.execute("SET threads=4")
+        # Optimize DuckDB settings - memory-efficient
+        conn.execute("SET memory_limit='3GB'")
+        conn.execute("SET threads=2")
         conn.execute("SET preserve_insertion_order=false")
-        conn.execute("SET max_temp_directory_size='50GB'")  # Plenty of temp space
 
         sql = """
         INSERT OR IGNORE INTO fact_trips (
-            trip_id, service_type, pickup_datetime, dropoff_datetime,
+            trip_id, service_type, pickup_datetime,
             pickup_date, pickup_hour, pickup_day_of_week,
-            pickup_zone_id, dropoff_zone_id,
-            trip_distance_miles, trip_duration_minutes, passenger_count,
+            pickup_zone_id,
+            trip_distance_miles, trip_duration_minutes,
             base_fare, tips, tolls, surcharges, airport_fee, taxes, total_fare,
             price_per_mile, price_per_minute, avg_speed_mph,
-            payment_type, is_valid, source_file
+            is_valid, source_file
         )
         SELECT 
-            -- Generate unique trip_id
-            MD5(CONCAT(
-                'yellow',
-                CAST(tpep_pickup_datetime AS VARCHAR),
-                CAST(tpep_dropoff_datetime AS VARCHAR),
-                CAST(trip_distance AS VARCHAR),
-                CAST(total_amount AS VARCHAR)
-            )) as trip_id,
+            -- Fast ID generation using hash
+            MD5(CONCAT('y', CAST(tpep_pickup_datetime AS VARCHAR), CAST(trip_distance AS VARCHAR))) as trip_id,
             
             'yellow' as service_type,
             tpep_pickup_datetime as pickup_datetime,
-            tpep_dropoff_datetime as dropoff_datetime,
             CAST(tpep_pickup_datetime AS DATE) as pickup_date,
             EXTRACT(HOUR FROM tpep_pickup_datetime) as pickup_hour,
             EXTRACT(DOW FROM tpep_pickup_datetime) as pickup_day_of_week,
             
             PULocationID as pickup_zone_id,
-            DOLocationID as dropoff_zone_id,
             
             trip_distance as trip_distance_miles,
             EXTRACT(EPOCH FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) / 60.0 as trip_duration_minutes,
-            CAST(passenger_count AS INTEGER) as passenger_count,
             
             fare_amount as base_fare,
             tip_amount as tips,
@@ -63,35 +53,13 @@ class DataTransformer:
             mta_tax as taxes,
             total_amount as total_fare,
             
-            -- Derived metrics (zero-division safe)
-            CASE 
-                WHEN trip_distance > 0.1 THEN total_amount / trip_distance
-                ELSE NULL 
-            END as price_per_mile,
+            -- Derived metrics (simplified, zero-division safe)
+            total_amount / NULLIF(trip_distance, 0) as price_per_mile,
+            total_amount / NULLIF(EXTRACT(EPOCH FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) / 60.0, 0) as price_per_minute,
+            trip_distance / NULLIF(EXTRACT(EPOCH FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) / 3600.0, 0) as avg_speed_mph,
             
-            CASE 
-                WHEN EXTRACT(EPOCH FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) > 60
-                THEN total_amount / (EXTRACT(EPOCH FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) / 60.0)
-                ELSE NULL
-            END as price_per_minute,
-            
-            CASE 
-                WHEN EXTRACT(EPOCH FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) > 0
-                THEN trip_distance / (EXTRACT(EPOCH FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) / 3600.0)
-                ELSE NULL
-            END as avg_speed_mph,
-            
-            payment_type,
-            
-            -- Data quality flag
-            CASE 
-                WHEN total_amount >= 0 
-                AND tpep_dropoff_datetime > tpep_pickup_datetime
-                AND trip_distance >= 0
-                AND (trip_distance / NULLIF(EXTRACT(EPOCH FROM (tpep_dropoff_datetime - tpep_pickup_datetime)) / 3600.0, 0)) < 100
-                THEN TRUE
-                ELSE FALSE
-            END as is_valid,
+            -- Simplified quality check
+            (total_amount >= 0 AND tpep_dropoff_datetime > tpep_pickup_datetime AND trip_distance >= 0) as is_valid,
             
             source_file
             
@@ -113,79 +81,48 @@ class DataTransformer:
 
         conn = DatabaseConnection.get_connection()
 
-        # Optimize DuckDB settings for 32GB Mac
-        conn.execute("SET memory_limit='8GB'")
-        conn.execute("SET threads=4")
+        # Optimize DuckDB settings - memory-efficient
+        conn.execute("SET memory_limit='3GB'")
+        conn.execute("SET threads=2")
         conn.execute("SET preserve_insertion_order=false")
-        conn.execute("SET max_temp_directory_size='50GB'")
 
         sql = """
         INSERT OR IGNORE INTO fact_trips (
-            trip_id, service_type, pickup_datetime, dropoff_datetime,
+            trip_id, service_type, pickup_datetime,
             pickup_date, pickup_hour, pickup_day_of_week,
-            pickup_zone_id, dropoff_zone_id,
-            trip_distance_miles, trip_duration_minutes, passenger_count,
-            base_fare, tips, tolls, surcharges, taxes, total_fare,
+            pickup_zone_id,
+            trip_distance_miles, trip_duration_minutes,
+            base_fare, tips, tolls, surcharges, airport_fee, taxes, total_fare,
             price_per_mile, price_per_minute, avg_speed_mph,
-            payment_type, is_valid, source_file
+            is_valid, source_file
         )
         SELECT 
-            MD5(CONCAT(
-                'green',
-                CAST(lpep_pickup_datetime AS VARCHAR),
-                CAST(lpep_dropoff_datetime AS VARCHAR),
-                CAST(trip_distance AS VARCHAR),
-                CAST(total_amount AS VARCHAR)
-            )) as trip_id,
+            MD5(CONCAT('g', CAST(lpep_pickup_datetime AS VARCHAR), CAST(trip_distance AS VARCHAR))) as trip_id,
             
             'green' as service_type,
             lpep_pickup_datetime as pickup_datetime,
-            lpep_dropoff_datetime as dropoff_datetime,
             CAST(lpep_pickup_datetime AS DATE) as pickup_date,
             EXTRACT(HOUR FROM lpep_pickup_datetime) as pickup_hour,
             EXTRACT(DOW FROM lpep_pickup_datetime) as pickup_day_of_week,
             
             PULocationID as pickup_zone_id,
-            DOLocationID as dropoff_zone_id,
             
             trip_distance as trip_distance_miles,
             EXTRACT(EPOCH FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) / 60.0 as trip_duration_minutes,
-            CAST(passenger_count AS INTEGER) as passenger_count,
             
             fare_amount as base_fare,
             tip_amount as tips,
             tolls_amount as tolls,
             extra + improvement_surcharge + congestion_surcharge as surcharges,
+            NULL as airport_fee,  -- Green taxi doesn't have airport fee
             mta_tax as taxes,
             total_amount as total_fare,
             
-            CASE 
-                WHEN trip_distance > 0.1 THEN total_amount / trip_distance
-                ELSE NULL 
-            END as price_per_mile,
+            total_amount / NULLIF(trip_distance, 0) as price_per_mile,
+            total_amount / NULLIF(EXTRACT(EPOCH FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) / 60.0, 0) as price_per_minute,
+            trip_distance / NULLIF(EXTRACT(EPOCH FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) / 3600.0, 0) as avg_speed_mph,
             
-            CASE 
-                WHEN EXTRACT(EPOCH FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) > 60
-                THEN total_amount / (EXTRACT(EPOCH FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) / 60.0)
-                ELSE NULL
-            END as price_per_minute,
-            
-            CASE 
-                WHEN EXTRACT(EPOCH FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) > 0
-                THEN trip_distance / (EXTRACT(EPOCH FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) / 3600.0)
-                ELSE NULL
-            END as avg_speed_mph,
-            
-            payment_type,
-            
-            CASE 
-                WHEN total_amount >= 0 
-                AND lpep_dropoff_datetime > lpep_pickup_datetime
-                AND trip_distance >= 0
-                AND (trip_distance / NULLIF(EXTRACT(EPOCH FROM (lpep_dropoff_datetime - lpep_pickup_datetime)) / 3600.0, 0)) < 100
-                THEN TRUE
-                ELSE FALSE
-            END as is_valid,
+            (total_amount >= 0 AND lpep_dropoff_datetime > lpep_pickup_datetime AND trip_distance >= 0) as is_valid,
             
             source_file
             
@@ -207,17 +144,17 @@ class DataTransformer:
 
         conn = DatabaseConnection.get_connection()
 
-        # Optimize DuckDB settings for 32GB Mac
-        conn.execute("SET memory_limit='8GB'")  # Much higher for 32GB system
-        conn.execute("SET threads=4")  # Use more cores
+        # Optimize DuckDB settings - reduce memory to avoid OOM
+        conn.execute("SET memory_limit='4GB'")  # Conservative limit
+        conn.execute("SET threads=4")  # Fewer threads = less memory
         conn.execute("SET preserve_insertion_order=false")
 
         # Get total row count
         total_rows = conn.execute("SELECT COUNT(*) FROM raw_hvfhv").fetchone()[0]
         logger.info(f" Processing {total_rows:,} HVFHV rows in batches...")
 
-        # Process in larger batches with 8GB memory available
-        batch_size = 5_000_000  # 5M rows per batch (we have plenty of RAM now!)
+        # Process in larger batches for better performance
+        batch_size = 5_000_000  # 5M rows per batch
         total_inserted = 0
         offset = 0
         batch_num = 1
@@ -228,37 +165,30 @@ class DataTransformer:
             )
 
             sql = f"""
-            INSERT OR IGNORE INTO fact_trips (
+            INSERT INTO fact_trips (
                 trip_id, service_type, hvfhs_license_num,
-                pickup_datetime, dropoff_datetime,
+                pickup_datetime,
                 pickup_date, pickup_hour, pickup_day_of_week,
-                pickup_zone_id, dropoff_zone_id,
+                pickup_zone_id,
                 trip_distance_miles, trip_duration_minutes,
                 base_fare, tips, tolls, surcharges, airport_fee, taxes, total_fare,
                 driver_pay, take_rate,
                 price_per_mile, price_per_minute, avg_speed_mph,
-                is_shared_request, is_shared_match,
+                is_shared_request,
                 is_valid, source_file
             )
             SELECT 
-                MD5(CONCAT(
-                    'hvfhv',
-                    CAST(pickup_datetime AS VARCHAR),
-                    CAST(dropoff_datetime AS VARCHAR),
-                    CAST(trip_miles AS VARCHAR),
-                    CAST(base_passenger_fare AS VARCHAR)
-                )) as trip_id,
+                -- Simple unique ID (no MD5 overhead)
+                'h_' || CAST({offset} AS VARCHAR) || '_' || CAST(ROW_NUMBER() OVER () AS VARCHAR) as trip_id,
                 
                 'hvfhv' as service_type,
                 hvfhs_license_num,
                 pickup_datetime,
-                dropoff_datetime,
                 CAST(pickup_datetime AS DATE) as pickup_date,
                 EXTRACT(HOUR FROM pickup_datetime) as pickup_hour,
                 EXTRACT(DOW FROM pickup_datetime) as pickup_day_of_week,
                 
                 CAST(PULocationID AS INTEGER) as pickup_zone_id,
-                CAST(DOLocationID AS INTEGER) as dropoff_zone_id,
                 
                 trip_miles as trip_distance_miles,
                 trip_time / 60.0 as trip_duration_minutes,
@@ -269,53 +199,27 @@ class DataTransformer:
                 bcf + congestion_surcharge as surcharges,
                 airport_fee,
                 sales_tax as taxes,
-                base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee as total_fare,
+                -- Pre-compute total_fare once
+                (base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee) as total_fare,
                 
                 driver_pay,
-                CASE 
-                    WHEN (base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee) > 0
-                    THEN ((base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee) - driver_pay) / 
-                         (base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee)
-                    ELSE NULL
-                END as take_rate,
+                -- Use computed total_fare alias in CTE would be better, but inline for now
+                (base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee - driver_pay) / 
+                    NULLIF(base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee, 0) as take_rate,
                 
-                CASE 
-                    WHEN trip_miles > 0.1 
-                    THEN (base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee) / trip_miles
-                    ELSE NULL 
-                END as price_per_mile,
+                (base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee) / NULLIF(trip_miles, 0) as price_per_mile,
+                (base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee) / NULLIF(trip_time / 60.0, 0) as price_per_minute,
+                trip_miles / NULLIF(trip_time / 3600.0, 0) as avg_speed_mph,
                 
-                CASE 
-                    WHEN trip_time > 60
-                    THEN (base_passenger_fare + tips + tolls + bcf + sales_tax + congestion_surcharge + airport_fee) / (trip_time / 60.0)
-                    ELSE NULL
-                END as price_per_minute,
+                (shared_request_flag = 'Y') as is_shared_request,
                 
-                CASE 
-                    WHEN trip_time > 0
-                    THEN trip_miles / (trip_time / 3600.0)
-                    ELSE NULL
-                END as avg_speed_mph,
-                
-                CASE WHEN shared_request_flag = 'Y' THEN TRUE ELSE FALSE END as is_shared_request,
-                CASE WHEN shared_match_flag = 'Y' THEN TRUE ELSE FALSE END as is_shared_match,
-                
-                CASE 
-                    WHEN base_passenger_fare >= 0 
-                    AND dropoff_datetime > pickup_datetime
-                    AND trip_miles >= 0
-                    AND driver_pay >= 0
-                    AND (trip_miles / NULLIF(trip_time / 3600.0, 0)) < 100
-                    THEN TRUE
-                    ELSE FALSE
-                END as is_valid,
+                (base_passenger_fare >= 0 AND dropoff_datetime > pickup_datetime AND trip_miles >= 0 AND driver_pay >= 0) as is_valid,
                 
                 source_file
                 
             FROM raw_hvfhv
             WHERE pickup_datetime IS NOT NULL
               AND dropoff_datetime IS NOT NULL
-            ORDER BY pickup_datetime
             LIMIT {batch_size} OFFSET {offset}
             """
 

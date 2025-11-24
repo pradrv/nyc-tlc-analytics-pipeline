@@ -303,7 +303,7 @@ async def download_sample_months(skip_if_exists: bool = True) -> List[Dict]:
     """
     downloader = TripDataDownloader()
     sample_months = config.get(
-        "date_ranges.sample_months", ["2024-01", "2024-06", "2024-12"]
+        "date_range.sample_months", ["2024-01", "2024-06", "2024-12"]
     )
 
     logger.info(f" Downloading sample months: {sample_months}")
